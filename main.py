@@ -11,14 +11,8 @@ from telebot import types
 TOKEN = "8714010498:AAFicf-XhijjjdLaVPD9CJResmx8O2-FWUA"
 bot = telebot.TeleBot(TOKEN)
 
-ADMIN_USERNAME = "@vietdev999"
-ZALO_CONTACT = "0329367512"
-TEN_CHU_BOT = "NGUYEN QUANG VIET"
 LINK_GET_KEY_WEB = "https://bot-file-hack.onrender.com"
-
-# Bộ nhớ lưu trữ key và IP (Dạng {'IP_NGUOI_DUNG': {'key': '...', 'used': False}})
 DATABASE_KEY = {}
-TOTAL_KEYS = 500  # Số lượng key ảo hiển thị cho uy tín
 
 app = Flask(__name__)
 
@@ -154,7 +148,7 @@ HTML_TEMPLATE = """
         <p class="subtitle">Get Key 12h Free System</p>
 
         <div class="card">
-            <div class="card-number" id="keyCount">386</div>
+            <div class="card-number">386</div>
             <div class="card-label">KEYS CÒN LẠI</div>
         </div>
 
@@ -221,37 +215,32 @@ def home():
 
 @app.route('/get-key', methods=['GET'])
 def get_key_api():
-    # Lấy IP thực của người truy cập (xử lý cả trường hợp chạy sau proxy của Render)
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    
-    # Nếu IP này đã từng lấy key rồi thì trả về đúng key cũ của họ
     if user_ip in DATABASE_KEY:
-        assigned_key = DATABASE_KEY[user_ip]['key']
+        assigned_key = DATABASE_KEY[user_ip]
     else:
-        # Sinh key ngẫu nhiên dạng VIP-XXXXXX
         random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         assigned_key = f"VIETDEV-{random_suffix}"
-        
-        # Lưu lại gắn với IP này
-        DATABASE_KEY[user_ip] = {
-            'key': assigned_key,
-            'used': False
-        }
-        
+        DATABASE_KEY[user_ip] = assigned_key
     return jsonify({'key': assigned_key})
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = types.InlineKeyboardMarkup()
     btn_web = types.InlineKeyboardButton("🔑 Lấy Key Tại Đây", url=LINK_GET_KEY_WEB)
     markup.add(btn_web)
-    bot.reply_to(message, f"Xin chào {message.from_user.first_name}!\nBấm vào nút bên dưới để truy cập trang web lấy Key độc quyền:", reply_markup=markup)
+    bot.reply_to(message, f"Xin chào {message.from_user.first_name}!\nBấm vào nút bên dưới để truy cập trang web lấy Key:", reply_markup=markup)
+
+def run_bot():
+    try:
+        bot.infinity_polling(none_stop=True, interval=0, timeout=20)
+    except Exception as e:
+        print(f"Bot error: {e}")
 
 if __name__ == "__main__":
-    t = threading.Thread(target=run_flask)
-    t.start()
-    bot.infinity_polling()
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
