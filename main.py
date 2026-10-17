@@ -4,7 +4,6 @@ os.system('pip install pyTelegramBotAPI Flask gunicorn')
 from flask import Flask, render_template_string
 import telebot
 from telebot import types
-
 TOKEN = "8743690981:AAHgq1CYm2CzcxnFL1fGJNasR3EACPcn0Ps"
 bot = telebot.TeleBot(TOKEN)
 
