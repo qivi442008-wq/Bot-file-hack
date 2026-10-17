@@ -1,89 +1,214 @@
 import os
 import threading
+import random
+import string
 os.system('pip install pyTelegramBotAPI Flask gunicorn')
-from flask import Flask, render_template_string
+
+from flask import Flask, render_template_string, request, jsonify
 import telebot
 from telebot import types
+
 TOKEN = "8714010498:AAFicf-XhijjjdLaVPD9CJResmx8O2-FWUA"
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_USERNAME = "@vietdev999"
 ZALO_CONTACT = "0329367512"
 TEN_CHU_BOT = "NGUYEN QUANG VIET"
-MANG_KEY_HOP_LE = "VIETDEV2026"
-
 LINK_GET_KEY_WEB = "https://bot-file-hack.onrender.com"
 
-KHO_GAME = {
-    '8ball': {
-        'ten': '8 Ball Pool Aimbot Pro',
-        'link_lay_key': LINK_GET_KEY_WEB,
-        'link_tai_file': 'https://mega.nz/file/link-tai-file-8ball-that'
-    },
-    'ff': {
-        'ten': 'FreeFire Menu VIP',
-        'link_lay_key': LINK_GET_KEY_WEB,
-        'link_tai_file': 'https://mega.nz/file/link-tai-file-ff-that'
-    }
-}
-
-cho_nhap_key = {}
+# Bộ nhớ lưu trữ key và IP (Dạng {'IP_NGUOI_DUNG': {'key': '...', 'used': False}})
+DATABASE_KEY = {}
+TOTAL_KEYS = 500  # Số lượng key ảo hiển thị cho uy tín
 
 app = Flask(__name__)
 
-HTML_WEB_KEY = """
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Get Key - VietDev</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>VIETDEV NEXUS V2.0 - GET KEY</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #0d0d0d;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: #141414;
+            border: 1px solid #ff3333;
+            border-radius: 12px;
+            padding: 25px 20px;
+            box-shadow: 0 0 20px rgba(255, 51, 51, 0.2);
+            text-align: center;
+        }
+        .logo {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            border: 2px solid #ff3333;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            background: #1a0000;
+        }
+        h1 {
+            color: #ff3333;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
+        }
+        .subtitle {
+            color: #888;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+        .card-number {
+            color: #ff3333;
+            font-size: 26px;
+            font-weight: bold;
+        }
+        .card-label {
+            color: #777;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 10px;
+            background: #1a1a1a;
+            border: 1.5px solid #ff3333;
+            border-radius: 8px;
+            color: #ff3333;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .btn:hover, .btn:active {
+            background: #ff3333;
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.4);
+        }
+        .btn-secondary {
+            border-color: #333;
+            color: #aaa;
+        }
+        .btn-secondary:hover {
+            background: #333;
+            color: #fff;
+            box-shadow: none;
+        }
+        .key-box {
+            display: none;
+            background: #220000;
+            border: 2px dashed #ff3333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            word-break: break-all;
+        }
+    </style>
 </head>
-<body class="bg-gray-950 text-white flex items-center justify-center h-screen m-0">
-    <div class="bg-gray-900 border border-gray-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center mx-4">
-        <h1 class="text-2xl font-bold mb-2 text-white">🔑 XÁC THỰC LẤY KEY</h1>
-        <p class="text-gray-400 text-sm mb-6">Hoàn thành đếm ngược để nhận mã key mở khóa file hack.</p>
+<body>
+    <div class="container" id="mainPage">
+        <div class="logo">⚡</div>
+        <h1>VIETDEV NEXUS V2.0</h1>
+        <p class="subtitle">Get Key 12h Free System</p>
+
+        <div class="card">
+            <div class="card-number" id="keyCount">386</div>
+            <div class="card-label">KEYS CÒN LẠI</div>
+        </div>
+
+        <div class="card">
+            <div class="card-number" style="color: #00ff66;">FREE</div>
+            <div class="card-label">HOÀN TOÀN MIỄN PHÍ</div>
+        </div>
+
+        <button class="btn" onclick="showKeyPage()">🔑 LẤY KEY MIỄN PHÍ</button>
+        <a href="https://zalo.me/0329367512" target="_blank" class="btn btn-secondary">👤 LIÊN HỆ ADMIN</a>
+        <a href="https://t.me/vietdev999" target="_blank" class="btn btn-secondary">👥 THAM GIA NHÓM</a>
+    </div>
+
+    <div class="container" id="keyPage" style="display: none;">
+        <div class="logo">🔑</div>
+        <h1>KEY ĐÃ SẴN SÀNG</h1>
+        <p class="subtitle">Mỗi địa chỉ IP chỉ nhận 1 key duy nhất</p>
+
+        <button class="btn" id="btnGet" onclick="fetchKey()">LẤY KEY</button>
+        <div class="key-box" id="keyDisplay">Đang tạo key...</div>
         
-        <div id="step1">
-            <button onclick="startCountdown()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl">
-                🚀 Bấm Vào Để Lấy Key
-            </button>
-        </div>
-
-        <div id="step2" class="hidden py-4">
-            <p class="text-yellow-400 font-medium">Đang tạo mã key... Vui lòng chờ <span id="countdown" class="font-bold text-white text-lg">5</span> giây</p>
-        </div>
-
-        <div id="step3" class="hidden">
-            <p class="text-gray-300 text-sm mb-2 font-medium">Mã Key của bạn đây:</p>
-            <div class="bg-black/50 p-3 rounded-xl border border-gray-800 text-green-400 font-mono text-xl font-bold mb-4">
-                {{ key }}
-            </div>
-            <button onclick="copyKey()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl">
-                📋 Sao chép Key ngay
-            </button>
-        </div>
+        <button class="btn btn-secondary" onclick="showMainPage()" style="margin-top: 15px;">← VỀ TRANG CHỦ</button>
     </div>
 
     <script>
-        function startCountdown() {
-            document.getElementById('step1').classList.add('hidden');
-            document.getElementById('step2').classList.remove('hidden');
-            let seconds = 5;
-            let interval = setInterval(function() {
-                seconds--;
-                document.getElementById('countdown').innerText = seconds;
-                if (seconds <= 0) {
-                    clearInterval(interval);
-                    document.getElementById('step2').classList.add('hidden');
-                    document.getElementById('step3').classList.remove('hidden');
-                }
-            }, 1000);
+        function showKeyPage() {
+            document.getElementById('mainPage').style.display = 'none';
+            document.getElementById('keyPage').style.display = 'block';
         }
 
-        function copyKey() {
-            navigator.clipboard.writeText("{{ key }}").then(() => alert("Đã sao chép key thành công! Hãy dán vào Bot Telegram."));
+        function showMainPage() {
+            document.getElementById('keyPage').style.display = 'none';
+            document.getElementById('mainPage').style.display = 'block';
+        }
+
+        function fetchKey() {
+            const btnGet = document.getElementById('btnGet');
+            const keyDisplay = document.getElementById('keyDisplay');
+            
+            btnGet.innerText = "ĐANG TẠO...";
+            
+            fetch('/get-key')
+                .then(response => response.json())
+                .then(data => {
+                    keyDisplay.style.display = 'block';
+                    keyDisplay.innerText = data.key;
+                    btnGet.innerText = "ĐÃ LẤY KEY THÀNH CÔNG!";
+                    btnGet.style.background = "#ff3333";
+                    btnGet.style.color = "#fff";
+                })
+                .catch(err => {
+                    keyDisplay.style.display = 'block';
+                    keyDisplay.innerText = "Lỗi kết nối server!";
+                });
         }
     </script>
 </body>
@@ -92,73 +217,41 @@ HTML_WEB_KEY = """
 
 @app.route('/')
 def home():
-    return render_template_string(HTML_WEB_KEY, key=MANG_KEY_HOP_LE)
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/get-key', methods=['GET'])
+def get_key_api():
+    # Lấy IP thực của người truy cập (xử lý cả trường hợp chạy sau proxy của Render)
+    user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    
+    # Nếu IP này đã từng lấy key rồi thì trả về đúng key cũ của họ
+    if user_ip in DATABASE_KEY:
+        assigned_key = DATABASE_KEY[user_ip]['key']
+    else:
+        # Sinh key ngẫu nhiên dạng VIP-XXXXXX
+        random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        assigned_key = f"VIETDEV-{random_suffix}"
+        
+        # Lưu lại gắn với IP này
+        DATABASE_KEY[user_ip] = {
+            'key': assigned_key,
+            'used': False
+        }
+        
+    return jsonify({'key': assigned_key})
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 @bot.message_handler(commands=['start'])
-def lenh_start(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add(
-        types.KeyboardButton("🎁 File hack free"),
-        types.KeyboardButton("📞 Hỗ trợ / Liên hệ")
-    )
-    text = f"🤖 **KHO FILE HACK FREE - {TEN_CHU_BOT}** 🤖\n\n👉 Vui lòng chọn chức năng bên dưới:"
-    bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
+def send_welcome(message):
+    markup = types.InlineKeyboardMarkup()
+    btn_web = types.InlineKeyboardButton("🔑 Lấy Key Tại Đây", url=LINK_GET_KEY_WEB)
+    markup.add(btn_web)
+    bot.reply_to(message, f"Xin chào {message.from_user.first_name}!\nBấm vào nút bên dưới để truy cập trang web lấy Key độc quyền:", reply_markup=markup)
 
-@bot.message_handler(func=lambda message: message.text == "🎁 File hack free")
-def chon_danh_sach_game(message):
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        types.InlineKeyboardButton("🎱 8 Ball Pool", callback_data='game_8ball'),
-        types.InlineKeyboardButton("🔥 FreeFire", callback_data='game_ff')
-    )
-    bot.send_message(message.chat.id, "🎯 **CHỌN TỰA GAME BẠN MUỐN TẢI:**", parse_mode="Markdown", reply_markup=markup)
-
-@bot.message_handler(func=lambda message: message.text == "📞 Hỗ trợ / Liên hệ")
-def thong_tin_lien_he(message):
-    text = (
-        f"📞 **THÔNG TIN LIÊN HỆ & HỖ TRỢ**\n\n"
-        f"👤 Chủ quản: **{TEN_CHU_BOT}**\n"
-        f"📱 Telegram Admin: {ADMIN_USERNAME}\n"
-        f"💬 Số Zalo hỗ trợ: `{ZALO_CONTACT}`"
-    )
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('game_'))
-def xu_ly_chon_game(call):
-    chat_id = call.message.chat.id
-    ma_game = call.data.split('_')[1]
-    if ma_game in KHO_GAME:
-        game = KHO_GAME[ma_game]
-        cho_nhap_key[chat_id] = ma_game
-        text = (
-            f"📥 **BẠN ĐÃ CHỌN: {game['ten']}**\n\n"
-            f"1️⃣ Nhấp vào link để lấy mã Key:\n👉 {game['link_lay_key']}\n\n"
-            f"2️⃣ Gửi mã Key đó vào khung chat này để nhận link tải!"
-        )
-        bot.edit_message_text(text, chat_id, call.message.message_id, parse_mode="Markdown")
-
-@bot.message_handler(func=lambda message: True)
-def kiem_tra_ma_key(message):
-    chat_id = message.chat.id
-    noi_dung_nhan = message.text.strip()
-    if chat_id in cho_nhap_key:
-        ma_game = cho_nhap_key[chat_id]
-        game = KHO_GAME[ma_game]
-        if noi_dung_nhan == MANG_KEY_HOP_LE:
-            del cho_nhap_key[chat_id]
-            thanh_cong = f"✅ **XÁC THỰC THÀNH CÔNG!**\n\nLink tải file **{game['ten']}**:\n👉 {game['link_tai_file']}"
-            bot.send_message(chat_id, thanh_cong, parse_mode="Markdown")
-        else:
-            bot.send_message(chat_id, "❌ **Mã key không hợp lệ!** Vui lòng lấy lại.")
-    else:
-        bot.send_message(chat_id, "👉 Bấm lệnh `/start` để mở menu chính.", parse_mode="Markdown")
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     t = threading.Thread(target=run_flask)
-    t.daemon = True
     t.start()
     bot.infinity_polling()
