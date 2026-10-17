@@ -1,5 +1,5 @@
 import os
-import threading
+os.system('pip install pyTelegramBotAPI Flask gunicorn')
 from flask import Flask, render_template_string
 import telebot
 from telebot import types
